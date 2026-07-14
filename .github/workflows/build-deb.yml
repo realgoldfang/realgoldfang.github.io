@@ -18,10 +18,12 @@ on:
         required: true
         type: choice
         options:
-          - mcp-sysd
+          - backup-util
           - howler
+          - luna-rs
           - lupine
-          - nspire-tools
+          - mcp-sysd
+          - russtly
       tag:
         description: 'Release tag (e.g. v1.0.0)'
         required: true
@@ -64,39 +66,31 @@ jobs:
         id: detect
         working-directory: source
         run: |
-          if [ -f "Cargo.toml" ]; then
+          if [ -f "build-deb.sh" ]; then
+            echo "build_type=script" >> "$GITHUB_OUTPUT"
+          elif [ -f "Cargo.toml" ]; then
             echo "build_type=cargo" >> "$GITHUB_OUTPUT"
-            # extract bin targets from Cargo.toml
+            # extract bin targets
             BINS=$(grep -A1 '^\[\[bin\]\]' Cargo.toml 2>/dev/null | grep 'name' | sed 's/.*name.*=.*"\(.*\)"/\1/' | tr '\n' ' ')
             if [ -z "${BINS}" ]; then
-              # single bin crate — use package name
               BINS=$(grep '^name' Cargo.toml | head -1 | sed 's/.*=.*"\(.*\)"/\1/')
             fi
             echo "bins=${BINS}" >> "$GITHUB_OUTPUT"
+          elif [ -f "Makefile" ] && [ -f "*.c" ] 2>/dev/null; then
+            echo "build_type=make" >> "$GITHUB_OUTPUT"
           elif [ -f "package.json" ]; then
             echo "build_type=electron" >> "$GITHUB_OUTPUT"
           else
-            echo "error: unknown project type"
+            echo "error: unknown project type in $(pwd)"
             exit 1
           fi
 
+      # -- Rust (cargo) --
       - name: Set up Rust
         if: steps.detect.outputs.build_type == 'cargo'
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: stable
-
-      - name: Set up Node.js
-        if: steps.detect.outputs.build_type == 'electron'
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      - name: Set package version
-        id: version
-        run: |
-          TAG="${{ steps.resolve.outputs.tag }}"
-          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
 
       - name: Build binaries (cargo)
         if: steps.detect.outputs.build_type == 'cargo'
@@ -137,7 +131,68 @@ jobs:
             dpkg-deb --build "${DEB_DIR}" "/tmp/debs/${binary}_${VER}_${ARCH}.deb"
           done
 
-          echo "debs_dir=/tmp/debs" >> "$GITHUB_ENV"
+      # -- C (make) --
+      - name: Build binary (make)
+        if: steps.detect.outputs.build_type == 'make'
+        working-directory: source
+        run: |
+          make clean 2>/dev/null || true
+          make -j"$(nproc)"
+
+      - name: Build .deb (make)
+        if: steps.detect.outputs.build_type == 'make'
+        working-directory: source
+        run: |
+          VER="${{ steps.version.outputs.version }}"
+          ARCH="$(dpkg --print-architecture)"
+          PKG="${{ steps.resolve.outputs.package }}"
+
+          DEB_DIR="/tmp/debs/${PKG}_${VER}_${ARCH}"
+          mkdir -p "${DEB_DIR}/DEBIAN"
+          mkdir -p "${DEB_DIR}/usr/local/bin"
+
+          # find the built binary
+          BIN=$(find . -maxdepth 1 -type f -executable ! -name '*.o' ! -name '*.sh' | head -1)
+          if [ -z "${BIN}" ]; then
+            BIN="${PKG}"
+          fi
+          cp "${BIN}" "${DEB_DIR}/usr/local/bin/"
+          chmod 755 "${DEB_DIR}/usr/local/bin/$(basename ${BIN})"
+
+          cat > "${DEB_DIR}/DEBIAN/control" << CTRL
+          Package: ${PKG}
+          Version: ${VER}
+          Architecture: ${ARCH}
+          Maintainer: goldfang <apt@realgoldfang.dev>
+          Description: ${PKG}
+          CTRL
+          sed -i '/^$/d' "${DEB_DIR}/DEBIAN/control"
+          sed -i 's/^ *//' "${DEB_DIR}/DEBIAN/control"
+
+          dpkg-deb --build "${DEB_DIR}" "/tmp/debs/${PKG}_${VER}_${ARCH}.deb"
+
+      # -- Python (build-deb.sh) --
+      - name: Set up Python
+        if: steps.detect.outputs.build_type == 'script'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Build .deb (build-deb.sh)
+        if: steps.detect.outputs.build_type == 'script'
+        working-directory: source
+        run: |
+          chmod +x build-deb.sh
+          bash build-deb.sh
+          mkdir -p /tmp/debs
+          find . -name '*.deb' -exec cp {} /tmp/debs/ \;
+
+      # -- Electron --
+      - name: Set up Node.js
+        if: steps.detect.outputs.build_type == 'electron'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
 
       - name: Build .deb (electron)
         if: steps.detect.outputs.build_type == 'electron'
@@ -145,10 +200,15 @@ jobs:
         run: |
           npm ci
           npx electron-builder --linux deb
-          # electron-builder outputs to dist/ — find the .deb
           mkdir -p /tmp/debs
           find . -name '*.deb' -exec cp {} /tmp/debs/ \;
-          echo "debs_dir=/tmp/debs" >> "$GITHUB_OUTPUT"
+
+      # -- Shared: version + GPG + aptly --
+      - name: Set package version
+        id: version
+        run: |
+          TAG="${{ steps.resolve.outputs.tag }}"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
 
       - name: Import GPG key
         env:
@@ -167,9 +227,7 @@ jobs:
           export APTLY_ROOT="/tmp/aptly-root"
           mkdir -p "${APTLY_ROOT}"
 
-          # Use our aptly config
           cp apt-repo/conf/aptly.conf /tmp/aptly.conf
-          # Update rootDir in config
           sed -i "s|/tmp/aptly-root|${APTLY_ROOT}|g" /tmp/aptly.conf
 
           for CODENAME in noble plucky; do
@@ -182,11 +240,9 @@ jobs:
                 "${REPO_NAME}"
           done
 
-          # Add debs to the runner's codename
           CODENAME=$(lsb_release -cs)
           echo "==> runner codename: ${CODENAME}"
 
-          # Map runner codename to supported codename
           SUPPORTED_CODENAME="noble"
           if [ "${CODENAME}" = "plucky" ] || [ "${CODENAME}" = "noble" ]; then
             SUPPORTED_CODENAME="${CODENAME}"

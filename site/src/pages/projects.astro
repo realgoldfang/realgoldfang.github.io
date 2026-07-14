@@ -20,6 +20,35 @@ try {
 
 const aptPackages = [
   {
+    name: 'backup-util',
+    description: 'backup utility with pyinstaller. schedule, restore, manage backups from the terminal.',
+    tags: ['python', 'backup', 'cli'],
+    github: 'https://github.com/realgoldfang/Backup-Util',
+    lang: 'python',
+  },
+  {
+    name: 'howler',
+    description: 'log aggregation and search for small setups. cli, tui, and gui frontends.',
+    tags: ['rust', 'logs', 'cli'],
+    github: 'https://github.com/realgoldfang/Howler',
+    lang: 'rust',
+    binaries: ['howler-cli', 'howler-tui', 'howler-gui'],
+  },
+  {
+    name: 'luna-rs',
+    description: 'TI-Nspire file transfer tool written in rust.',
+    tags: ['rust', 'calculator', 'transfer'],
+    github: 'https://github.com/realgoldfang/Luna-rs',
+    lang: 'rust',
+  },
+  {
+    name: 'lupine',
+    description: 'fast, minimal file sync tool. think rsync, but with a focus on simplicity and idempotent operations.',
+    tags: ['electron', 'files', 'sync'],
+    github: 'https://github.com/realgoldfang/Lupine',
+    lang: 'electron',
+  },
+  {
     name: 'mcp-sysd',
     description: 'systemd integration for MCP. manage services, view logs, and control system state through natural language.',
     tags: ['rust', 'systemd', 'mcp'],
@@ -27,27 +56,11 @@ const aptPackages = [
     lang: 'rust',
   },
   {
-    name: 'howler',
-    description: 'log aggregation and search for small setups. cli, tui, and gui frontends.',
-    tags: ['rust', 'logs', 'cli'],
-    github: 'https://github.com/realgoldfang/howler',
+    name: 'russtly',
+    description: 'native podcast client built with rust and egui.',
+    tags: ['rust', 'podcast', 'gui'],
+    github: 'https://github.com/realgoldfang/RuSStly',
     lang: 'rust',
-    binaries: ['howler-cli', 'howler-tui', 'howler-gui'],
-  },
-  {
-    name: 'lupine',
-    description: 'fast, minimal file sync tool. think rsync, but with a focus on simplicity and idempotent operations.',
-    tags: ['electron', 'files', 'cli'],
-    github: 'https://github.com/realgoldfang/lupine',
-    lang: 'electron',
-  },
-  {
-    name: 'nspire-tools',
-    description: 'toolchain for TI-Nspire calculator development. cli and gui frontends.',
-    tags: ['rust', 'calculator', 'tools'],
-    github: 'https://github.com/realgoldfang/nspire-tools',
-    lang: 'rust',
-    binaries: ['nspire-cli', 'nspire-gui'],
   },
 ];
 ---
