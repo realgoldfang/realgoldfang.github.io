@@ -2,25 +2,23 @@
 # remove-package.sh
 # Removes a package from the aptly repository.
 #
-# Usage: ./remove-package.sh <codename> <package-name> <version>
-# Example: ./remove-package.sh noble mcp-sysd 1.0.0
+# Usage: ./remove-package.sh <codename> <package-name> [version]
+# If version is omitted, all versions are removed.
 
 set -euo pipefail
 
-CODENAME="${1:?usage: remove-package.sh <codename> <package-name> <version>}"
-PACKAGE="${2:?usage: remove-package.sh <codename> <package-name> <version>}"
-VERSION="${3:?usage: remove-package.sh <codename> <package-name> <version>}"
+CODENAME="${1:?usage: remove-package.sh <codename> <package-name> [version]}"
+PACKAGE="${2:?usage: remove-package.sh <codename> <package-name> [version]}"
+VERSION="${3:-}"
 
 REPO_NAME="goldfang-${CODENAME}"
 
-echo "==> removing ${PACKAGE}_${VERSION} from ${REPO_NAME}"
+if [ -n "${VERSION}" ]; then
+  echo "==> removing ${PACKAGE} (= ${VERSION}) from ${REPO_NAME}"
+  aptly repo remove "${REPO_NAME}" "${PACKAGE} (= ${VERSION})"
+else
+  echo "==> removing all versions of ${PACKAGE} from ${REPO_NAME}"
+  aptly repo remove "${REPO_NAME}" "${PACKAGE}"
+fi
 
-aptly repo remove "${REPO_NAME}" "${PACKAGE} (= ${VERSION})"
-
-echo "==> republishing ${CODENAME}"
-aptly publish update \
-  -batch \
-  -gpg-key="goldfang-apt-repo <apt@realgoldfang.dev>" \
-  "${CODENAME}" filesystem:nginx-repo
-
-echo "==> done"
+echo "==> done. re-publish to deploy changes."

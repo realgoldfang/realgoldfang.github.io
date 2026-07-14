@@ -3,13 +3,11 @@ node_modules/
 site/node_modules/
 
 # Build output
-site/dist/
 dist/
 
-# aptly state
+# aptly state (CI-only)
 apt-repo/downloads/
 apt-repo/db/
-apt-repo/public/
 
 # Secrets
 *.gpg

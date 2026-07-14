@@ -2,19 +2,15 @@
 # rotate-key.sh
 # Rotates the GPG signing key for the apt repository.
 #
-# Run this on the publishing server. This will:
-# 1. Generate a new key
-# 2. Re-sign all published repos with the new key
-# 3. Update the web-accessible public key
-# 4. Remind you to update client machines
+# Run locally or in CI. After rotation, update the GitHub Actions secret
+# with the new private key.
 
 set -euo pipefail
 
 OLD_KEY="goldfang-apt-repo"
-NEW_KEY_NAME="goldfang-apt-repo-$(date +%Y%m%d)"
+TIMESTAMP=$(date +%Y%m%d)
+NEW_KEY_NAME="goldfang-apt-repo-${TIMESTAMP}"
 KEY_EMAIL="apt@realgoldfang.dev"
-KEYRING="/etc/apt/repo-signing-key.gpg"
-PUBKEY_WEB="/var/www/apt/pubkey.gpg"
 
 echo "==> rotating apt signing key"
 echo "old key: ${OLD_KEY}"
@@ -34,30 +30,16 @@ Expire-Date: 2y
 %commit
 EOF
 
-echo "==> exporting new key"
-gpg --export --output "${KEYRING}" "${NEW_KEY_NAME} <${KEY_EMAIL}>"
-chmod 600 "${KEYRING}"
-
-# Update web public key (show both old and new during transition)
-gpg --export --armor "${NEW_KEY_NAME} <${KEY_EMAIL}>" > "${PUBKEY_WEB}"
-chmod 644 "${PUBKEY_WEB}"
-
-echo "==> re-publishing all repos with new key"
-for CODENAME in noble plucky; do
-  aptly publish update \
-    -batch \
-    -gpg-key="${NEW_KEY_NAME} <${KEY_EMAIL}>" \
-    "${CODENAME}" filesystem:nginx-repo 2>/dev/null || true
-done
-
-echo ""
-echo "==> key rotation complete"
-echo ""
-echo "NEW PUBLIC KEY fingerprint:"
+echo "==> new key fingerprint:"
 gpg --list-keys --keyid-format long "${NEW_KEY_NAME}"
+
 echo ""
-echo "CLIENTS MUST RE-ADD THE KEY:"
-echo "  curl -fsSL https://apt.realgoldfang.dev/pubkey.gpg | sudo gpg --dearmor -o /etc/apt/keyrings/goldfang.gpg"
+echo "==> export the new private key for GitHub Actions secret:"
+echo "  gpg --export-secret-keys '${NEW_KEY_NAME} <${KEY_EMAIL}>' | base64"
 echo ""
-echo "BACKUP the new private key:"
-echo "  gpg --export-secret-keys '${NEW_KEY_NAME} <${KEY_EMAIL}>' > backup-key-$(date +%Y%m%d).gpg"
+echo "==> update the APTLY_GPG_KEY secret in your repo settings"
+echo "==> update the public key in site/public/apt/pubkey.gpg:"
+echo "  gpg --export --armor '${NEW_KEY_NAME} <${KEY_EMAIL}>' > site/public/apt/pubkey.gpg"
+echo ""
+echo "==> clients must re-add the key after rotation:"
+echo "  curl -fsSL https://realgoldfang.github.io/apt/pubkey.gpg | sudo gpg --dearmor -o /etc/apt/keyrings/goldfang.gpg"

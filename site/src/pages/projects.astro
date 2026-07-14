@@ -1,61 +1,81 @@
 ---
 import Base from '../layouts/Base.astro';
 
-const projects = [
+let devbuntu: any = null;
+let adwolf: any = null;
+
+try {
+  const res = await fetch('https://api.github.com/repos/realgoldfang/devbuntu/releases/latest', {
+    headers: { 'Accept': 'application/vnd.github.v3+json' }
+  });
+  if (res.ok) devbuntu = await res.json();
+} catch {}
+
+try {
+  const res = await fetch('https://api.github.com/repos/realgoldfang/ad-wolf/releases/latest', {
+    headers: { 'Accept': 'application/vnd.github.v3+json' }
+  });
+  if (res.ok) adwolf = await res.json();
+} catch {}
+
+const aptPackages = [
   {
     name: 'mcp-sysd',
     description: 'systemd integration for MCP. manage services, view logs, and control system state through natural language.',
-    tags: ['golang', 'systemd', 'mcp'],
+    tags: ['rust', 'systemd', 'mcp'],
     github: 'https://github.com/realgoldfang/mcp-sysd',
-    apt: true,
+    lang: 'rust',
   },
   {
-    name: 'ad-wolf',
-    description: 'dns-level ad blocker with a blocklist that actually respects your time. lightweight, fast, and unapologetic.',
-    tags: ['dns', 'linux', 'networking'],
-    github: 'https://github.com/realgoldfang/ad-wolf',
-    apt: true,
+    name: 'howler',
+    description: 'log aggregation and search for small setups. cli, tui, and gui frontends.',
+    tags: ['rust', 'logs', 'cli'],
+    github: 'https://github.com/realgoldfang/howler',
+    lang: 'rust',
+    binaries: ['howler-cli', 'howler-tui', 'howler-gui'],
   },
   {
     name: 'lupine',
     description: 'fast, minimal file sync tool. think rsync, but with a focus on simplicity and idempotent operations.',
-    tags: ['golang', 'files', 'cli'],
+    tags: ['electron', 'files', 'cli'],
     github: 'https://github.com/realgoldfang/lupine',
-    apt: false,
+    lang: 'electron',
   },
   {
-    name: 'devbuntu',
-    description: 'opinionated dev environment setup for ubuntu. because your laptop should be reproducible.',
-    tags: ['bash', 'ubuntu', 'devops'],
-    github: 'https://github.com/realgoldfang/devbuntu',
-    apt: false,
-  },
-  {
-    name: 'howler',
-    description: 'log aggregation and search for small setups. no elasticsearch, no nonsense.',
-    tags: ['golang', 'logs', 'cli'],
-    github: 'https://github.com/realgoldfang/howler',
-    apt: false,
-  },
-  {
-    name: 'ti-nspire tools',
-    description: 'toolchain for TI-Nspire calculator development. because some of us never stopped.',
-    tags: ['python', 'calculator', 'tools'],
-    github: 'https://github.com/realgoldfang',
-    apt: false,
+    name: 'nspire-tools',
+    description: 'toolchain for TI-Nspire calculator development. cli and gui frontends.',
+    tags: ['rust', 'calculator', 'tools'],
+    github: 'https://github.com/realgoldfang/nspire-tools',
+    lang: 'rust',
+    binaries: ['nspire-cli', 'nspire-gui'],
   },
 ];
 ---
 <Base title="projects — goldfang">
   <h1>projects</h1>
 
-  {projects.map((p) => (
+  <h2>apt packages</h2>
+  <p style="font-size: 0.9rem;">
+    install via <code>apt</code> after
+    <a href="/apt">adding the repo</a>.
+    available for noble (24.04) and plucky (26.04), amd64 + arm64.
+  </p>
+
+  {aptPackages.map((p) => (
     <div class="card">
       <div class="card-header">
         <h3>{p.name}</h3>
-        {p.apt && <span class="tag apt-tag">available via apt</span>}
+        <span class="tag tag-apt">apt</span>
+        <span class="tag">{p.lang}</span>
       </div>
       <p>{p.description}</p>
+      {p.binaries && (
+        <p class="binaries">
+          binaries: {p.binaries.map((b, i) => (
+            <code>{b}</code>{i < p.binaries.length - 1 ? ', ' : ''}
+          ))}
+        </p>
+      )}
       <div class="card-footer">
         <div class="tags">
           {p.tags.map((t) => <span class="tag">{t}</span>)}
@@ -64,6 +84,62 @@ const projects = [
       </div>
     </div>
   ))}
+
+  <h2>downloads</h2>
+  <p style="font-size: 0.9rem;">
+    not linux packages — direct downloads from github releases.
+  </p>
+
+  {devbuntu && (
+    <div class="card">
+      <div class="card-header">
+        <h3>devbuntu</h3>
+        <span class="tag tag-download">iso</span>
+      </div>
+      <p>opinionated dev environment setup for ubuntu. boot it, run it, done.</p>
+      <div class="download-meta">
+        <a href={devbuntu.html_url} class="btn btn-primary">
+          download {devbuntu.tag_name}
+        </a>
+        <span class="release-date">
+          released {new Date(devbuntu.published_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+        </span>
+      </div>
+      {devbuntu.body && (
+        <details class="changelog">
+          <summary>changelog</summary>
+          <pre><code>{devbuntu.body.slice(0, 1000)}</code></pre>
+        </details>
+      )}
+    </div>
+  )}
+
+  {adwolf && (
+    <div class="card">
+      <div class="card-header">
+        <h3>ad-wolf</h3>
+        <span class="tag tag-download">apk</span>
+      </div>
+      <p>dns-level ad blocker for android. blocks what others won't.</p>
+      <div class="download-meta">
+        <a href={adwolf.html_url} class="btn btn-primary">
+          download {adwolf.tag_name} (apk)
+        </a>
+        <span class="release-date">
+          released {new Date(adwolf.published_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+        </span>
+      </div>
+      <p class="install-note">
+        install from unknown sources required — not distributed via google play.
+      </p>
+      {adwolf.body && (
+        <details class="changelog">
+          <summary>changelog</summary>
+          <pre><code>{adwolf.body.slice(0, 1000)}</code></pre>
+        </details>
+      )}
+    </div>
+  )}
 </Base>
 
 <style>
@@ -74,13 +150,11 @@ const projects = [
     margin-bottom: 0.5rem;
   }
 
-  .card-header h3 {
-    margin: 0;
-  }
+  .card-header h3 { margin: 0; }
 
-  .apt-tag {
-    color: var(--green);
-    border-color: var(--green);
+  .binaries {
+    font-size: 0.85rem;
+    margin-bottom: 0.5rem;
   }
 
   .card-footer {
@@ -90,14 +164,41 @@ const projects = [
     margin-top: 0.75rem;
   }
 
-  .tags {
+  .tags { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+  .gh-link { font-size: 0.85rem; white-space: nowrap; }
+
+  .download-meta {
     display: flex;
-    flex-wrap: wrap;
-    gap: 0.4rem;
+    align-items: center;
+    gap: 1rem;
+    margin: 0.75rem 0;
   }
 
-  .gh-link {
+  .release-date {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+  }
+
+  .changelog {
+    margin-top: 0.75rem;
+  }
+
+  .changelog summary {
+    cursor: pointer;
+    color: var(--text-muted);
     font-size: 0.85rem;
-    white-space: nowrap;
+  }
+
+  .changelog pre {
+    font-size: 0.8rem;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+
+  .install-note {
+    font-size: 0.8rem;
+    color: var(--orange);
+    font-style: italic;
+    margin-bottom: 0;
   }
 </style>

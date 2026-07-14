@@ -7,28 +7,38 @@ import Base from '../layouts/Base.astro';
   <div class="prose">
     <p>
       a personal <code>apt</code> repository hosting my own tools. add it once,
-      install them anywhere.
+      install them anywhere. hosted on github pages — no servers, no tailscale.
     </p>
 
     <h2>available packages</h2>
     <div class="card">
       <h3>mcp-sysd</h3>
       <p>systemd integration for MCP — manage services through natural language.</p>
-      <span class="tag">golang</span>
+      <span class="tag tag-apt">rust</span>
     </div>
     <div class="card">
-      <h3>ad-wolf</h3>
-      <p>dns-level ad blocker with a blocklist that respects your time.</p>
-      <span class="tag">dns</span>
+      <h3>howler</h3>
+      <p>log aggregation and search. cli, tui, and gui frontends.</p>
+      <span class="tag tag-apt">rust</span>
+    </div>
+    <div class="card">
+      <h3>lupine</h3>
+      <p>fast, minimal file sync tool.</p>
+      <span class="tag tag-apt">electron</span>
+    </div>
+    <div class="card">
+      <h3>nspire-tools</h3>
+      <p>TI-Nspire calculator toolchain. cli and gui.</p>
+      <span class="tag tag-apt">rust</span>
     </div>
 
     <h2>setup (ubuntu/debian)</h2>
 
     <p>1. add the signing key:</p>
-    <pre><code>curl -fsSL https://apt.realgoldfang.dev/pubkey.gpg | sudo gpg --dearmor -o /etc/apt/keyrings/goldfang.gpg</code></pre>
+    <pre><code>curl -fsSL https://realgoldfang.github.io/apt/pubkey.gpg | sudo gpg --dearmor -o /etc/apt/keyrings/goldfang.gpg</code></pre>
 
     <p>2. add the repository:</p>
-    <pre><code>echo "deb [signed-by=/etc/apt/keyrings/goldfang.gpg] https://apt.realgoldfang.dev stable main" | sudo tee /etc/apt/sources.list.d/goldfang.list</code></pre>
+    <pre><code>echo "deb [signed-by=/etc/apt/keyrings/goldfang.gpg] https://realgoldfang.github.io/apt stable main" | sudo tee /etc/apt/sources.list.d/goldfang.list</code></pre>
 
     <p>3. install packages:</p>
     <pre><code>sudo apt update && sudo apt install mcp-sysd</code></pre>
@@ -38,6 +48,13 @@ import Base from '../layouts/Base.astro';
       <li><code>noble</code> — Ubuntu 24.04 (amd64, arm64)</li>
       <li><code>plucky</code> — Ubuntu 26.04 (amd64, arm64)</li>
     </ul>
+
+    <h2>how it works</h2>
+    <p>
+      packages are built from source via github actions on each release tag.
+      aptly manages the repo metadata and signing. the resulting static tree
+      is published to github pages — no server-side processing, no aptly daemon.
+    </p>
 
     <h2>troubleshooting</h2>
     <p>
@@ -49,12 +66,6 @@ import Base from '../layouts/Base.astro';
 </Base>
 
 <style>
-  pre {
-    font-size: 0.85rem;
-  }
-
-  pre code {
-    word-break: break-all;
-    white-space: pre-wrap;
-  }
+  pre { font-size: 0.85rem; }
+  pre code { word-break: break-all; white-space: pre-wrap; }
 </style>

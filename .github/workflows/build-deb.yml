@@ -1,0 +1,205 @@
+# .github/workflows/build-deb.yml
+# Builds a .deb package from a source repo, signs it with aptly, and
+# commits the updated repo tree to main for Pages deployment.
+#
+# Triggered by:
+#   - Tag push from source repos (via repository_dispatch)
+#   - Manual workflow_dispatch
+
+name: Build Deb Package
+
+on:
+  repository_dispatch:
+    types: [release-published]
+  workflow_dispatch:
+    inputs:
+      package:
+        description: 'Package name'
+        required: true
+        type: choice
+        options:
+          - mcp-sysd
+          - howler
+          - lupine
+          - nspire-tools
+      tag:
+        description: 'Release tag (e.g. v1.0.0)'
+        required: true
+      repo:
+        description: 'Source repo (owner/repo)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - package: mcp-sysd
+            repo: realgoldfang/mcp-sysd
+            build_type: cargo
+            binaries: mcp-sysd
+          - package: howler
+            repo: realgoldfang/howler
+            build_type: cargo
+            binaries: howler-cli howler-tui howler-gui
+          - package: lupine
+            repo: realgoldfang/lupine
+            build_type: electron
+            binaries: lupine
+          - package: nspire-tools
+            repo: realgoldfang/nspire-tools
+            build_type: cargo
+            binaries: nspire-cli nspire-gui
+
+    steps:
+      - name: Resolve inputs
+        id: resolve
+        run: |
+          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            echo "package=${{ github.event.client_payload.package }}" >> "$GITHUB_OUTPUT"
+            echo "tag=${{ github.event.client_payload.tag }}" >> "$GITHUB_OUTPUT"
+            echo "source_repo=${{ github.event.client_payload.repo }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "package=${{ inputs.package }}" >> "$GITHUB_OUTPUT"
+            echo "tag=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+            echo "source_repo=${{ inputs.repo }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          path: this-repo
+
+      - name: Checkout source repo
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ steps.resolve.outputs.source_repo }}
+          ref: ${{ steps.resolve.outputs.tag }}
+          path: source
+
+      - name: Set up Rust
+        if: matrix.build_type == 'cargo'
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Set up Node.js
+        if: matrix.build_type == 'electron'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Set package version
+        id: version
+        run: |
+          TAG="${{ steps.resolve.outputs.tag }}"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Build binary (cargo)
+        if: matrix.build_type == 'cargo'
+        working-directory: source
+        run: |
+          for binary in ${{ matrix.binaries }}; do
+            echo "==> building ${binary}"
+            cargo build --release --bin "${binary}"
+          done
+
+      - name: Build .deb (cargo binaries)
+        if: matrix.build_type == 'cargo'
+        working-directory: source
+        run: |
+          PKG="${{ steps.resolve.outputs.package }}"
+          VER="${{ steps.version.outputs.version }}"
+          ARCH="$(dpkg --print-architecture)"
+
+          for binary in ${{ matrix.binaries }}; do
+            DEB_DIR="build/${binary}_${VER}_${ARCH}"
+            mkdir -p "${DEB_DIR}/DEBIAN"
+            mkdir -p "${DEB_DIR}/usr/local/bin"
+
+            cp "target/release/${binary}" "${DEB_DIR}/usr/local/bin/${binary}"
+            chmod 755 "${DEB_DIR}/usr/local/bin/${binary}"
+
+            cat > "${DEB_DIR}/DEBIAN/control" << EOF
+          Package: ${binary}
+          Version: ${VER}
+          Architecture: ${ARCH}
+          Maintainer: goldfang <apt@realgoldfang.dev>
+          Description: ${binary} from ${PKG}
+          EOF
+            sed -i 's/^          //' "${DEB_DIR}/DEBIAN/control"
+
+            dpkg-deb --build "${DEB_DIR}" "${DEB_DIR}.deb"
+            echo "debs+=${DEB_DIR}.deb" >> "$GITHUB_ENV"
+          done
+
+      - name: Build .deb (electron)
+        if: matrix.build_type == 'electron'
+        working-directory: source
+        run: |
+          npm ci
+          npx electron-builder --linux deb
+
+      - name: Import GPG key
+        env:
+          APTLY_GPG_KEY: ${{ secrets.APTLY_GPG_KEY }}
+        run: |
+          echo "${APTLY_GPG_KEY}" | base64 -d | gpg --batch --import
+
+      - name: Install aptly
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y aptly
+
+      - name: Initialize aptly repos
+        working-directory: this-repo
+        run: |
+          for CODENAME in noble plucky; do
+            ./apt-repo/scripts/init-repo.sh "${CODENAME}" || true
+          done
+
+      - name: Add debs to aptly
+        working-directory: this-repo
+        run: |
+          CODENAME=$(lsb_release -cs)
+          echo "==> adding packages for ${CODENAME}"
+
+          # Find all .deb files
+          find /home/runner/work -name '*.deb' -path '*/build/*' | while read deb; do
+            echo "==> adding $(basename ${deb})"
+            ./apt-repo/scripts/add-package.sh "${CODENAME}" "${deb}"
+          done
+
+          # Also add for the other supported codename
+          OTHER_CODENAME="noble"
+          if [ "${CODENAME}" = "noble" ]; then
+            OTHER_CODENAME="plucky"
+          fi
+          find /home/runner/work -name '*.deb' -path '*/build/*' | while read deb; do
+            ./apt-repo/scripts/add-package.sh "${OTHER_CODENAME}" "${deb}" 2>/dev/null || true
+          done
+
+      - name: Publish apt repo
+        working-directory: this-repo
+        run: |
+          ./apt-repo/scripts/publish.sh apt-repo/public
+
+      - name: Export public key
+        working-directory: this-repo
+        run: |
+          KEY_NAME="goldfang-apt-repo"
+          KEY_EMAIL="apt@realgoldfang.dev"
+          mkdir -p site/public/apt
+          gpg --export --armor "${KEY_NAME} <${KEY_EMAIL}>" > site/public/apt/pubkey.gpg
+
+      - name: Commit updated repo
+        working-directory: this-repo
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add apt-repo/public/ site/public/apt/pubkey.gpg
+          git commit -m "apt: update repo with ${{ steps.resolve.outputs.package }} ${{ steps.resolve.outputs.tag }}" || echo "no changes to commit"
+          git push

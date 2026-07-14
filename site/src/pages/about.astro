@@ -12,8 +12,8 @@ import Base from '../layouts/Base.astro';
     </p>
 
     <p>
-      primary stack: <code>go</code>, <code>rust</code>, <code>python</code>,
-      linux, systemd, nginx. i like small binaries, clean init files, and
+      primary stack: <code>rust</code>, <code>go</code>, <code>python</code>,
+      linux, systemd. i like small binaries, clean init files, and
       machines that do exactly what they're told.
     </p>
 
@@ -27,9 +27,8 @@ import Base from '../layouts/Base.astro';
 
     <h2>setup</h2>
     <p>
-      ubuntu 26.04 daily driver. raspberry pi cluster tunneled through
-      tailscale to a public ec2 box running nginx. deployment is boring on
-      purpose.
+      ubuntu 26.04 daily driver. everything deploys via github actions
+      to github pages. no servers to babysit.
     </p>
 
     <h2>this site</h2>
@@ -42,7 +41,5 @@ import Base from '../layouts/Base.astro';
 </Base>
 
 <style>
-  .prose p:first-of-type {
-    font-size: 1.05rem;
-  }
+  .prose p:first-of-type { font-size: 1.05rem; }
 </style>

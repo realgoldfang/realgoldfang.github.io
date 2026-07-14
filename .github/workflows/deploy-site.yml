@@ -1,17 +1,25 @@
 # .github/workflows/deploy-site.yml
-# Deploys the static site to the EC2 server on push to main.
+# Builds the Astro site and deploys to GitHub Pages.
+# Also copies the apt repo tree (managed by build-deb.yml) into the Pages artifact.
 
 name: Deploy Site
 
 on:
   push:
     branches: [main]
-    paths:
-      - 'site/**'
-      - 'site/astro.config.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
 
 jobs:
-  build-and-deploy:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -30,12 +38,28 @@ jobs:
         working-directory: site
         run: npm run build
 
-      - name: Deploy to server
-        uses: easingthemes/ssh-deploy@v5
+      - name: Copy apt repo tree into Pages artifact
+        run: |
+          if [ -d "apt-repo/public" ]; then
+            mkdir -p dist/apt
+            cp -r apt-repo/public/* dist/apt/
+            echo "apt repo tree copied to dist/apt/"
+          else
+            echo "no apt-repo/public/ found, skipping apt repo in this deploy"
+          fi
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
-          REMOTE_HOST: ${{ secrets.DEPLOY_HOST }}
-          REMOTE_USER: ${{ secrets.DEPLOY_USER }}
-          SOURCE: site/dist/
-          TARGET: /var/www/site
-          EXCLUDE: node_modules/
+          path: dist/
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,5 +1,22 @@
 ---
 import Base from '../layouts/Base.astro';
+
+let devbuntu: any = null;
+let adwolf: any = null;
+
+try {
+  const res = await fetch('https://api.github.com/repos/realgoldfang/devbuntu/releases/latest', {
+    headers: { 'Accept': 'application/vnd.github.v3+json' }
+  });
+  if (res.ok) devbuntu = await res.json();
+} catch {}
+
+try {
+  const res = await fetch('https://api.github.com/repos/realgoldfang/ad-wolf/releases/latest', {
+    headers: { 'Accept': 'application/vnd.github.v3+json' }
+  });
+  if (res.ok) adwolf = await res.json();
+} catch {}
 ---
 <Base title="goldfang">
   <section class="hero">
@@ -16,26 +33,50 @@ import Base from '../layouts/Base.astro';
 
   <section class="recent">
     <h2>recent work</h2>
+
     <div class="card">
       <h3><a href="/projects#mcp-sysd">mcp-sysd</a></h3>
       <p>systemd integration for MCP — manage services through natural language.</p>
-      <span class="tag">golang</span>
+      <span class="tag tag-apt">apt</span>
+      <span class="tag">rust</span>
       <span class="tag">systemd</span>
-      <span class="tag">mcp</span>
     </div>
+
     <div class="card">
       <h3><a href="/projects#ad-wolf">ad-wolf</a></h3>
       <p>ad-blocker that doesn't respect the ad industry.</p>
-      <span class="tag">dns</span>
-      <span class="tag">linux</span>
+      {adwolf && (
+        <a href={adwolf.html_url} class="btn btn-outline" style="margin-top: 0.5rem;">
+          download v{adwolf.tag_name} (apk)
+        </a>
+      )}
+      <div style="margin-top: 0.5rem;">
+        <span class="tag tag-download">android</span>
+        <span class="tag">dns</span>
+      </div>
     </div>
+
+    {devbuntu && (
+      <div class="card">
+        <h3><a href="/projects#devbuntu">devbuntu</a></h3>
+        <p>opinionated dev environment setup for ubuntu.</p>
+        <a href={devbuntu.html_url} class="btn btn-primary" style="margin-top: 0.5rem;">
+          download {devbuntu.tag_name} (iso)
+        </a>
+        <p style="font-size: 0.8rem; margin-top: 0.5rem; margin-bottom: 0;">
+          released {new Date(devbuntu.published_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+        </p>
+        <div style="margin-top: 0.5rem;">
+          <span class="tag tag-download">linux</span>
+          <span class="tag">ubuntu</span>
+        </div>
+      </div>
+    )}
   </section>
 </Base>
 
 <style>
-  .hero {
-    padding: 4rem 0 3rem;
-  }
+  .hero { padding: 4rem 0 3rem; }
 
   h1 {
     font-size: 2.5rem;
@@ -57,20 +98,8 @@ import Base from '../layouts/Base.astro';
     font-size: 0.95rem;
   }
 
-  .links a {
-    color: var(--text);
-    text-decoration: none;
-  }
-
-  .links a:hover {
-    color: var(--accent);
-  }
-
-  .sep {
-    color: var(--text-muted);
-  }
-
-  .recent h2 {
-    margin-top: 0;
-  }
+  .links a { color: var(--text); text-decoration: none; }
+  .links a:hover { color: var(--accent); }
+  .sep { color: var(--text-muted); }
+  .recent h2 { margin-top: 0; }
 </style>

@@ -23,8 +23,8 @@ const { title, description = 'goldfang — builder of things' } = Astro.props;
       <div class="nav-links">
         <a href="/about">about</a>
         <a href="/projects">projects</a>
-        <a href="/contact">contact</a>
         <a href="/apt">apt repo</a>
+        <a href="/contact">contact</a>
       </div>
     </nav>
     <main>
@@ -47,16 +47,13 @@ const { title, description = 'goldfang — builder of things' } = Astro.props;
     --accent: #a855f7;
     --accent-dim: #7c3aed;
     --green: #22c55e;
+    --orange: #f97316;
     --red: #ef4444;
     --font-mono: 'JetBrains Mono', monospace;
     --font-sans: 'Inter', system-ui, sans-serif;
   }
 
-  * {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
 
   html {
     font-family: var(--font-sans);
@@ -65,11 +62,7 @@ const { title, description = 'goldfang — builder of things' } = Astro.props;
     line-height: 1.6;
   }
 
-  body {
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-  }
+  body { min-height: 100vh; display: flex; flex-direction: column; }
 
   nav {
     display: flex;
@@ -91,10 +84,7 @@ const { title, description = 'goldfang — builder of things' } = Astro.props;
     text-decoration: none;
   }
 
-  .nav-links {
-    display: flex;
-    gap: 1.5rem;
-  }
+  .nav-links { display: flex; gap: 1.5rem; }
 
   .nav-links a {
     color: var(--text-muted);
@@ -103,9 +93,7 @@ const { title, description = 'goldfang — builder of things' } = Astro.props;
     transition: color 0.2s;
   }
 
-  .nav-links a:hover {
-    color: var(--text);
-  }
+  .nav-links a:hover { color: var(--text); }
 
   main {
     flex: 1;
@@ -123,47 +111,16 @@ const { title, description = 'goldfang — builder of things' } = Astro.props;
     font-size: 0.8rem;
   }
 
-  footer a {
-    color: var(--accent);
-    text-decoration: none;
-  }
+  footer a { color: var(--accent); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
 
-  footer a:hover {
-    text-decoration: underline;
-  }
+  h1 { font-size: 2rem; margin-bottom: 1rem; font-weight: 700; }
+  h2 { font-size: 1.4rem; margin: 2rem 0 0.8rem; color: var(--accent); font-weight: 600; }
+  h3 { font-size: 1.1rem; margin: 1.5rem 0 0.5rem; font-weight: 600; }
 
-  h1 {
-    font-size: 2rem;
-    margin-bottom: 1rem;
-    font-weight: 700;
-  }
-
-  h2 {
-    font-size: 1.4rem;
-    margin: 2rem 0 0.8rem;
-    color: var(--accent);
-    font-weight: 600;
-  }
-
-  h3 {
-    font-size: 1.1rem;
-    margin: 1.5rem 0 0.5rem;
-    font-weight: 600;
-  }
-
-  p {
-    margin-bottom: 1rem;
-    color: var(--text-muted);
-  }
-
-  a {
-    color: var(--accent);
-    text-decoration: none;
-  }
-
-  a:hover {
-    text-decoration: underline;
-  }
+  p { margin-bottom: 1rem; color: var(--text-muted); }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
 
   code {
     font-family: var(--font-mono);
@@ -182,20 +139,10 @@ const { title, description = 'goldfang — builder of things' } = Astro.props;
     margin: 1rem 0;
   }
 
-  pre code {
-    background: none;
-    padding: 0;
-  }
+  pre code { background: none; padding: 0; }
 
-  ul, ol {
-    padding-left: 1.5rem;
-    margin-bottom: 1rem;
-    color: var(--text-muted);
-  }
-
-  li {
-    margin-bottom: 0.4rem;
-  }
+  ul, ol { padding-left: 1.5rem; margin-bottom: 1rem; color: var(--text-muted); }
+  li { margin-bottom: 0.4rem; }
 
   .card {
     background: var(--bg-card);
@@ -206,9 +153,7 @@ const { title, description = 'goldfang — builder of things' } = Astro.props;
     transition: border-color 0.2s;
   }
 
-  .card:hover {
-    border-color: var(--accent-dim);
-  }
+  .card:hover { border-color: var(--accent-dim); }
 
   .tag {
     display: inline-block;
@@ -222,7 +167,20 @@ const { title, description = 'goldfang — builder of things' } = Astro.props;
     margin-right: 0.5rem;
   }
 
-  .prose {
-    max-width: 65ch;
+  .tag-apt { color: var(--green); border-color: var(--green); }
+  .tag-download { color: var(--orange); border-color: var(--orange); }
+
+  .btn {
+    display: inline-block;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: opacity 0.2s;
   }
+
+  .btn:hover { opacity: 0.8; text-decoration: none; }
+  .btn-primary { background: var(--accent); color: white; }
+  .btn-outline { border: 1px solid var(--border); color: var(--text); }
 </style>

@@ -1,54 +1,61 @@
 # realgoldfang.github.io
 
-Personal site + APT repository. Served from EC2 via nginx, tunneled through Tailscale from Raspberry Pi.
+Personal site + APT repository. Hosted on GitHub Pages.
 
 ## Repository Structure
 
 ```
 .
-├── site/                    # Astro static site
+├── site/                          # Astro static site source
 │   ├── src/
-│   │   ├── layouts/
-│   │   ├── pages/
-│   │   └── styles/
+│   │   ├── layouts/Base.astro
+│   │   └── pages/
+│   │       ├── index.astro        # home (fetches Devbuntu + Ad-Wolf releases)
+│   │       ├── about.astro
+│   │       ├── projects.astro     # apt packages + download links
+│   │       ├── apt.astro          # repo setup instructions
+│   │       └── contact.astro
 │   ├── public/
+│   │   └── apt/pubkey.gpg         # public signing key (committed)
 │   ├── astro.config.mjs
 │   └── package.json
-├── apt-repo/                # APT repository management
-│   ├── conf/
-│   │   └── aptly.conf       # aptly configuration
-│   └── scripts/
-│       ├── generate-repo-key.sh   # generate GPG signing key
-│       ├── add-package.sh         # add a .deb to the repo
-│       ├── remove-package.sh      # remove a package
-│       ├── publish-repo.sh        # sign + publish all repos
-│       └── rotate-key.sh          # rotate the signing key
-├── nginx/
-│   ├── realgoldfang-site.conf    # nginx vhost for website
-│   ├── realgoldfang-apt.conf     # nginx vhost for apt repo
-│   └── setup-nginx.sh           # enable sites on server
+├── apt-repo/                      # APT repository management
+│   ├── conf/aptly.conf
+│   ├── scripts/
+│   │   ├── setup-signing-key.sh   # import GPG key from CI secret
+│   │   ├── init-repo.sh           # initialize aptly repo for a codename
+│   │   ├── add-package.sh         # add a .deb to the repo
+│   │   ├── remove-package.sh      # remove a package
+│   │   ├── publish.sh             # sign + publish all repos
+│   │   ├── export-pubkey.sh       # export public key
+│   │   └── rotate-key.sh          # rotate the signing key
+│   └── public/                    # published apt repo tree (committed)
 ├── .github/workflows/
-│   ├── deploy-site.yml              # deploy site on push
-│   └── build-and-publish-deb.yml    # build + publish debs on tag
+│   ├── deploy-site.yml            # build site + deploy to Pages
+│   └── build-deb.yml              # build debs + aptly publish + commit
 └── README.md
 ```
+
+## Architecture
+
+- **Site**: Astro static site deployed to `realgoldfang.github.io` via GitHub Pages
+- **APT repo**: static tree at `realgoldfang.github.io/apt/`, built by aptly in CI
+- **No servers**: everything runs on GitHub Actions + Pages. No EC2, no nginx, no Tailscale.
+- **Devbuntu + Ad-Wolf**: download links fetched from GitHub Releases API at build time (not APT packages — they produce ISOs and APKs)
 
 ## End-User Setup
 
 ### Adding the APT Repository
 
-On any Ubuntu/Debian machine:
-
 ```bash
-# Add the signing key
-curl -fsSL https://apt.realgoldfang.dev/pubkey.gpg | sudo gpg --dearmor -o /etc/apt/keyrings/goldfang.gpg
+# 1. add the signing key
+curl -fsSL https://realgoldfang.github.io/apt/pubkey.gpg | sudo gpg --dearmor -o /etc/apt/keyrings/goldfang.gpg
 
-# Add the repository
-echo "deb [signed-by=/etc/apt/keyrings/goldfang.gpg] https://apt.realgoldfang.dev stable main" | sudo tee /etc/apt/sources.list.d/goldfang.list
+# 2. add the repository
+echo "deb [signed-by=/etc/apt/keyrings/goldfang.gpg] https://realgoldfang.github.io/apt stable main" | sudo tee /etc/apt/sources.list.d/goldfang.list
 
-# Update and install
-sudo apt update
-sudo apt install mcp-sysd
+# 3. install
+sudo apt update && sudo apt install mcp-sysd
 ```
 
 ### Supported Distributions
@@ -60,102 +67,78 @@ sudo apt install mcp-sysd
 
 ## Adding a New Package
 
-1. Build the `.deb` (or let CI do it on tag push)
-2. Copy it to the server:
-   ```bash
-   scp build/mcp-sysd_1.0.0_amd64.deb server:/tmp/
-   ```
-3. Add to the repo:
-   ```bash
-   # SSH into the server
-   cd /opt/goldfang-apt-repo
-   ./scripts/add-package.sh noble /tmp/mcp-sysd_1.0.0_amd64.deb
-   ```
-4. Publish:
-   ```bash
-   ./scripts/publish-repo.sh
-   ```
+### Via CI (recommended)
+
+Each source repo triggers the `build-deb.yml` workflow via `repository_dispatch` on release:
+
+```json
+{
+  "event_type": "release-published",
+  "client_payload": {
+    "package": "mcp-sysd",
+    "tag": "v1.0.0",
+    "repo": "realgoldfang/mcp-sysd"
+  }
+}
+```
+
+Or use `workflow_dispatch` from the Actions tab.
+
+### Manual Local Commands
+
+```bash
+# 1. install aptly
+sudo apt install aptly
+
+# 2. import the signing key
+gpg --import private-key.gpg
+
+# 3. initialize repos (first time only)
+./apt-repo/scripts/init-repo.sh noble
+./apt-repo/scripts/init-repo.sh plucky
+
+# 4. add a package
+./apt-repo/scripts/add-package.sh noble ./mcp-sysd_1.0.0_amd64.deb
+
+# 5. publish
+./apt-repo/scripts/publish.sh apt-repo/public
+
+# 6. commit and push
+git add apt-repo/public/
+git commit -m "apt: update repo with mcp-sysd v1.0.0"
+git push
+```
 
 ## Removing a Package
 
 ```bash
-cd /opt/goldfang-apt-repo
-./scripts/remove-package.sh noble mcp-sysd 1.0.0
+./apt-repo/scripts/remove-package.sh noble mcp-sysd 1.0.0
+# then publish + commit
 ```
 
 ## Rotating the Signing Key
 
-If the key is compromised or annually:
-
 ```bash
-cd /opt/goldfang-apt-repo
-./scripts/rotate-key.sh
+./apt-repo/scripts/rotate-key.sh
 ```
 
-This will:
-1. Generate a new GPG key
-2. Re-sign all published repos
-3. Update the public key at `https://apt.realgoldfang.dev/pubkey.gpg`
+This generates a new key and prints instructions. After rotation:
+1. Update the `APTLY_GPG_KEY` GitHub Actions secret with the new private key (base64-encoded)
+2. Update `site/public/apt/pubkey.gpg` with the new public key
+3. Commit and push — clients must re-download the key:
+   ```bash
+   curl -fsSL https://realgoldfang.github.io/apt/pubkey.gpg | sudo gpg --dearmor -o /etc/apt/keyrings/goldfang.gpg
+   ```
 
-**Clients must re-download the key after rotation:**
-```bash
-curl -fsSL https://apt.realgoldfang.dev/pubkey.gpg | sudo gpg --dearmor -o /etc/apt/keyrings/goldfang.gpg
-```
-
-### Key Backup
-
-Export the private key for offline backup:
-```bash
-gpg --export-secret-keys 'goldfang-apt-repo <apt@realgoldfang.dev>' > backup-key.gpg
-```
-Store this on an encrypted USB or in a password manager.
-
-## Server Setup
-
-### Prerequisites
-- Ubuntu 24.04+ on EC2
-- nginx installed
-- aptly installed (`sudo apt install aptly`)
-- Tailscale configured
-
-### Initial Setup
-
-```bash
-# 1. Install aptly
-sudo apt install aptly
-
-# 2. Generate signing key
-sudo ./apt-repo/scripts/generate-repo-key.sh
-
-# 3. Copy aptly config
-sudo cp apt-repo/conf/aptly.conf /etc/aptly.conf
-
-# 4. Enable nginx sites
-cd nginx && sudo ./setup-nginx.sh
-
-# 5. Set up Let's Encrypt
-sudo certbot --nginx -d realgoldfang.github.io
-sudo certbot --nginx -d apt.realgoldfang.dev
-```
-
-### GitHub Actions Secrets
+## GitHub Actions Secrets
 
 | Secret | Description |
 |--------|-------------|
-| `DEPLOY_SSH_KEY` | SSH private key for deploying site |
-| `DEPLOY_HOST` | EC2 hostname (via Tailscale) |
-| `DEPLOY_USER` | SSH user on EC2 |
-| `APTLY_SSH_KEY` | SSH key for aptly server |
-| `APTLY_HOST` | Aptly server hostname |
-| `APTLY_USER` | SSH user on aptly server |
+| `APTLY_GPG_KEY` | Base64-encoded GPG private key for apt repo signing |
 
-## Deployment
+## Workflows
 
-- **Site**: Push to `main` triggers `deploy-site.yml`, which builds Astro and deploys static files to `/var/www/site`
-- **APT packages**: Push a tag (`v*`) triggers `build-and-publish-deb.yml`, which builds the `.deb` for amd64 + arm64 and publishes to the aptly repo
-
-## Architecture Notes
-
-- Two separate nginx server blocks: website and apt repo. A broken aptly publish can't take down the portfolio site.
-- The APT repo is public (that's the point). Admin endpoints (aptly, webhook triggers) are Tailscale-only.
-- PM2-managed deployment for the existing portfolio site is unaffected.
+| Workflow | Trigger | What it does |
+|----------|---------|--------------|
+| `deploy-site.yml` | push to main | builds Astro site, copies apt repo tree, deploys to Pages |
+| `build-deb.yml` | repository_dispatch / workflow_dispatch | builds .deb, runs aptly, commits updated repo tree |
