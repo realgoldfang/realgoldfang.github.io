@@ -62,6 +62,12 @@ jobs:
           ref: ${{ steps.resolve.outputs.tag }}
           path: source
 
+      - name: Set package version
+        id: version
+        run: |
+          TAG="${{ steps.resolve.outputs.tag }}"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+
       - name: Detect build type
         id: detect
         working-directory: source
@@ -209,13 +215,7 @@ jobs:
           mkdir -p /tmp/debs
           find . -name '*.deb' -exec cp {} /tmp/debs/ \;
 
-      # -- Shared: version + GPG + aptly --
-      - name: Set package version
-        id: version
-        run: |
-          TAG="${{ steps.resolve.outputs.tag }}"
-          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
-
+      # -- Shared: GPG + aptly --
       - name: Import GPG key
         env:
           APTLY_GPG_KEY: ${{ secrets.APTLY_GPG_KEY }}
