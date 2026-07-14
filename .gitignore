@@ -9,8 +9,9 @@ dist/
 apt-repo/downloads/
 apt-repo/db/
 
-# Secrets
+# Secrets (but NOT the public apt signing key)
 *.gpg
+!site/public/apt/pubkey.gpg
 *.asc
 backup-key*.gpg
 
