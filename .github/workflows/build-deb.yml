@@ -92,6 +92,12 @@ jobs:
         with:
           toolchain: stable
 
+      - name: Install system deps (cargo)
+        if: steps.detect.outputs.build_type == 'cargo'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libasound2-dev pkg-config
+
       - name: Build binaries (cargo)
         if: steps.detect.outputs.build_type == 'cargo'
         working-directory: source
