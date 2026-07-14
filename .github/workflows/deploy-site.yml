@@ -37,13 +37,13 @@ jobs:
         run: npm run build
 
       - name: Ensure apt dir exists
-        run: mkdir -p dist/apt
+        run: mkdir -p site/dist/apt
 
       - name: Copy apt repo tree into Pages artifact
         run: |
           if [ -d "apt-repo/public" ] && [ "$(ls -A apt-repo/public 2>/dev/null)" ]; then
-            cp -r apt-repo/public/* dist/apt/
-            echo "apt repo tree copied to dist/apt/"
+            cp -r apt-repo/public/* site/dist/apt/
+            echo "apt repo tree copied to site/dist/apt/"
           else
             echo "no apt-repo/public/ found, skipping apt repo in this deploy"
           fi
@@ -51,7 +51,7 @@ jobs:
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: dist/
+          path: site/dist/
 
   deploy:
     needs: build
