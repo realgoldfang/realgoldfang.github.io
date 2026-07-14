@@ -1,0 +1,48 @@
+---
+import Base from '../layouts/Base.astro';
+---
+<Base title="about — goldfang" description="who is goldfang">
+  <h1>about</h1>
+
+  <div class="prose">
+    <p>
+      i build things that run on bare metal and talk over wireguard. most of my
+      work lives at the intersection of systems programming, networking, and
+      making my own tools because nothing else does the job right.
+    </p>
+
+    <p>
+      primary stack: <code>go</code>, <code>rust</code>, <code>python</code>,
+      linux, systemd, nginx. i like small binaries, clean init files, and
+      machines that do exactly what they're told.
+    </p>
+
+    <h2>what i care about</h2>
+    <ul>
+      <li>self-hosting and owning your infrastructure</li>
+      <li>minimal, composable tools over bloated frameworks</li>
+      <li>building things that respect the machine they run on</li>
+      <li>apt repos that actually work</li>
+    </ul>
+
+    <h2>setup</h2>
+    <p>
+      ubuntu 26.04 daily driver. raspberry pi cluster tunneled through
+      tailscale to a public ec2 box running nginx. deployment is boring on
+      purpose.
+    </p>
+
+    <h2>this site</h2>
+    <p>
+      static site built with astro. no runtime dependencies, no javascript
+      bloat. the source lives at
+      <a href="https://github.com/realgoldfang/realgoldfang.github.io">github</a>.
+    </p>
+  </div>
+</Base>
+
+<style>
+  .prose p:first-of-type {
+    font-size: 1.05rem;
+  }
+</style>

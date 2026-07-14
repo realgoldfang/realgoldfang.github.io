@@ -1,0 +1,60 @@
+---
+import Base from '../layouts/Base.astro';
+---
+<Base title="apt repository — goldfang" description="personal apt repository for goldfang's tools">
+  <h1>apt repository</h1>
+
+  <div class="prose">
+    <p>
+      a personal <code>apt</code> repository hosting my own tools. add it once,
+      install them anywhere.
+    </p>
+
+    <h2>available packages</h2>
+    <div class="card">
+      <h3>mcp-sysd</h3>
+      <p>systemd integration for MCP — manage services through natural language.</p>
+      <span class="tag">golang</span>
+    </div>
+    <div class="card">
+      <h3>ad-wolf</h3>
+      <p>dns-level ad blocker with a blocklist that respects your time.</p>
+      <span class="tag">dns</span>
+    </div>
+
+    <h2>setup (ubuntu/debian)</h2>
+
+    <p>1. add the signing key:</p>
+    <pre><code>curl -fsSL https://apt.realgoldfang.dev/pubkey.gpg | sudo gpg --dearmor -o /etc/apt/keyrings/goldfang.gpg</code></pre>
+
+    <p>2. add the repository:</p>
+    <pre><code>echo "deb [signed-by=/etc/apt/keyrings/goldfang.gpg] https://apt.realgoldfang.dev stable main" | sudo tee /etc/apt/sources.list.d/goldfang.list</code></pre>
+
+    <p>3. install packages:</p>
+    <pre><code>sudo apt update && sudo apt install mcp-sysd</code></pre>
+
+    <h2>supported distributions</h2>
+    <ul>
+      <li><code>noble</code> — Ubuntu 24.04 (amd64, arm64)</li>
+      <li><code>plucky</code> — Ubuntu 26.04 (amd64, arm64)</li>
+    </ul>
+
+    <h2>troubleshooting</h2>
+    <p>
+      if you get a <code>BADSIG</code> error, re-download the signing key. keys
+      rotate annually or on compromise — check this page for the latest
+      instructions.
+    </p>
+  </div>
+</Base>
+
+<style>
+  pre {
+    font-size: 0.85rem;
+  }
+
+  pre code {
+    word-break: break-all;
+    white-space: pre-wrap;
+  }
+</style>

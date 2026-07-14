@@ -1,0 +1,103 @@
+---
+import Base from '../layouts/Base.astro';
+
+const projects = [
+  {
+    name: 'mcp-sysd',
+    description: 'systemd integration for MCP. manage services, view logs, and control system state through natural language.',
+    tags: ['golang', 'systemd', 'mcp'],
+    github: 'https://github.com/realgoldfang/mcp-sysd',
+    apt: true,
+  },
+  {
+    name: 'ad-wolf',
+    description: 'dns-level ad blocker with a blocklist that actually respects your time. lightweight, fast, and unapologetic.',
+    tags: ['dns', 'linux', 'networking'],
+    github: 'https://github.com/realgoldfang/ad-wolf',
+    apt: true,
+  },
+  {
+    name: 'lupine',
+    description: 'fast, minimal file sync tool. think rsync, but with a focus on simplicity and idempotent operations.',
+    tags: ['golang', 'files', 'cli'],
+    github: 'https://github.com/realgoldfang/lupine',
+    apt: false,
+  },
+  {
+    name: 'devbuntu',
+    description: 'opinionated dev environment setup for ubuntu. because your laptop should be reproducible.',
+    tags: ['bash', 'ubuntu', 'devops'],
+    github: 'https://github.com/realgoldfang/devbuntu',
+    apt: false,
+  },
+  {
+    name: 'howler',
+    description: 'log aggregation and search for small setups. no elasticsearch, no nonsense.',
+    tags: ['golang', 'logs', 'cli'],
+    github: 'https://github.com/realgoldfang/howler',
+    apt: false,
+  },
+  {
+    name: 'ti-nspire tools',
+    description: 'toolchain for TI-Nspire calculator development. because some of us never stopped.',
+    tags: ['python', 'calculator', 'tools'],
+    github: 'https://github.com/realgoldfang',
+    apt: false,
+  },
+];
+---
+<Base title="projects — goldfang">
+  <h1>projects</h1>
+
+  {projects.map((p) => (
+    <div class="card">
+      <div class="card-header">
+        <h3>{p.name}</h3>
+        {p.apt && <span class="tag apt-tag">available via apt</span>}
+      </div>
+      <p>{p.description}</p>
+      <div class="card-footer">
+        <div class="tags">
+          {p.tags.map((t) => <span class="tag">{t}</span>)}
+        </div>
+        <a href={p.github} class="gh-link">github →</a>
+      </div>
+    </div>
+  ))}
+</Base>
+
+<style>
+  .card-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .card-header h3 {
+    margin: 0;
+  }
+
+  .apt-tag {
+    color: var(--green);
+    border-color: var(--green);
+  }
+
+  .card-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 0.75rem;
+  }
+
+  .tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+
+  .gh-link {
+    font-size: 0.85rem;
+    white-space: nowrap;
+  }
+</style>
