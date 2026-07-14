@@ -72,7 +72,9 @@ const aptPackages = [
       {p.binaries && (
         <p class="binaries">
           binaries: {p.binaries.map((b, i) => (
-            <code>{b}</code>{i < p.binaries.length - 1 ? ', ' : ''}
+            <Fragment>
+              <code>{b}</code>{i < p.binaries.length - 1 ? ', ' : ''}
+            </Fragment>
           ))}
         </p>
       )}
