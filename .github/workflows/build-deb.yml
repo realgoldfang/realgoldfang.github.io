@@ -6,6 +6,8 @@
 # Triggered by:
 #   - repository_dispatch from source repos on release
 #   - Manual workflow_dispatch
+#
+# Requires secret: APT_REPO_TOKEN (PAT with push access to realgoldfang/apt-repo)
 
 name: Build Deb Package
 
@@ -71,6 +73,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: realgoldfang/apt-repo
+          token: ${{ secrets.APT_REPO_TOKEN }}
           path: apt-repo
 
       - name: Set package version
@@ -357,10 +360,11 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add site/public/apt/pubkey.gpg
-          git diff --cached --quiet && echo "no changes to commit" && exit 0
-          git commit -m "chore: update apt signing key"
+          git commit -m "chore: update apt signing key" --allow-empty
           git push
 
       - name: Trigger site deploy
+        env:
+          GH_TOKEN: ${{ secrets.APT_REPO_TOKEN }}
         run: |
           gh workflow run deploy-site.yml --repo realgoldfang/realgoldfang.github.io
