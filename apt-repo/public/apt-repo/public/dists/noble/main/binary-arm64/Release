@@ -1,0 +1,6 @@
+Origin: apt-repo/public noble
+Label: apt-repo/public noble
+Archive: noble
+Suite: noble
+Architecture: arm64
+Component: main

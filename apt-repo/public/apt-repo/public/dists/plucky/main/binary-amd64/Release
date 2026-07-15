@@ -1,0 +1,6 @@
+Origin: apt-repo/public plucky
+Label: apt-repo/public plucky
+Archive: plucky
+Suite: plucky
+Architecture: amd64
+Component: main
