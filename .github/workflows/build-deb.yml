@@ -293,7 +293,14 @@ jobs:
             fi
           done
 
-          echo "==> published tree:"
+          echo "==> aptly root tree:"
+          find "${APTLY_ROOT}/public" -type f 2>/dev/null | head -20
+
+          echo "==> copying to ${OUTPUT}"
+          rm -rf "${OUTPUT}"
+          cp -r "${APTLY_ROOT}/public" "${OUTPUT}"
+
+          echo "==> final published tree:"
           find "${OUTPUT}" -type f | head -20
 
       - name: Export public key
