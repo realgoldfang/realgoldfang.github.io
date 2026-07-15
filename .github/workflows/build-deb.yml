@@ -352,7 +352,8 @@ jobs:
             exit 1
           fi
           rm -rf public
-          cp -r "${APTLY_PUBLIC}" public
+          mkdir -p public
+          cp -r "${APTLY_PUBLIC}"/* public/
           echo "==> copied aptly output to apt-repo/public/"
           find public/ -type f | head -30
 
