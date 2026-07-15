@@ -1,6 +1,6 @@
 # .github/workflows/deploy-site.yml
 # Builds the Astro site and deploys to GitHub Pages.
-# Clones the apt-repo repo and includes it in the Pages artifact.
+# Clones the apt-repo and includes its public/ in the Pages artifact.
 
 name: Deploy Site
 
@@ -42,16 +42,14 @@ jobs:
           repository: realgoldfang/apt-repo
           path: apt-repo
 
-      - name: Ensure apt dir exists
-        run: mkdir -p site/dist/apt
-
-      - name: Copy apt repo into Pages artifact
+      - name: Merge apt-repo into Pages dist
         run: |
+          mkdir -p site/dist/apt
           if [ -d "apt-repo/public" ] && [ "$(ls -A apt-repo/public 2>/dev/null)" ]; then
             cp -r apt-repo/public/. site/dist/apt/
-            echo "apt repo copied to site/dist/apt/"
+            echo "apt repo merged into site/dist/apt/"
           else
-            echo "no apt-repo/public/ found, skipping apt repo in this deploy"
+            echo "no apt-repo/public/, skipping"
           fi
 
       - name: Upload Pages artifact

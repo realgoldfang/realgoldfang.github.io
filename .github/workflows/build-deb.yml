@@ -82,41 +82,33 @@ jobs:
           TAG="${{ steps.resolve.outputs.tag }}"
           echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
 
+      # ──────────────────────────────────────────────────────────────
+      # Detect build type
+      # ──────────────────────────────────────────────────────────────
       - name: Detect build type
         id: detect
         working-directory: source
         run: |
           if [ -f "build-deb.sh" ]; then
             echo "build_type=script" >> "$GITHUB_OUTPUT"
+            echo "==> build type: script"
           elif [ -f "Cargo.toml" ]; then
             echo "build_type=cargo" >> "$GITHUB_OUTPUT"
-            # Try root-level [[bin]] first
-            BINS=$(grep -A1 '^\[\[bin\]\]' Cargo.toml 2>/dev/null | grep 'name' | sed 's/.*name.*=.*"\(.*\)"/\1/' | tr '\n' ' ')
-            # If empty, try workspace: find [[bin]] in each member
-            if [ -z "${BINS}" ]; then
-              if grep -q '^\[workspace\]' Cargo.toml 2>/dev/null; then
-                echo "==> detected workspace project"
-                for member in $(grep -A100 '^\[workspace\]' Cargo.toml | grep -A50 'members' | grep '"' | sed 's/.*"\(.*\)".*/\1/'); do
-                  if [ -f "${member}/Cargo.toml" ]; then
-                    MEMBER_BINS=$(grep -A1 '^\[\[bin\]\]' "${member}/Cargo.toml" 2>/dev/null | grep 'name' | sed 's/.*name.*=.*"\(.*\)"/\1/' | tr '\n' ' ')
-                    BINS="${BINS}${MEMBER_BINS} "
-                  fi
-                done
-              fi
-            fi
-            BINS=$(echo "${BINS}" | xargs)
-            echo "bins=${BINS}" >> "$GITHUB_OUTPUT"
-            echo "==> detected bins: ${BINS}"
+            echo "==> build type: cargo"
           elif [ -f "Makefile" ] && [ -f "*.c" ] 2>/dev/null; then
             echo "build_type=make" >> "$GITHUB_OUTPUT"
+            echo "==> build type: make"
           elif [ -f "package.json" ]; then
             echo "build_type=electron" >> "$GITHUB_OUTPUT"
+            echo "==> build type: electron"
           else
             echo "error: unknown project type in $(pwd)"
             exit 1
           fi
 
-      # -- Rust (cargo) --
+      # ──────────────────────────────────────────────────────────────
+      # Rust (cargo)
+      # ──────────────────────────────────────────────────────────────
       - name: Set up Rust
         if: steps.detect.outputs.build_type == 'cargo'
         uses: actions-rust-lang/setup-rust-toolchain@v1
@@ -129,46 +121,57 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq libasound2-dev pkg-config
 
+      - name: Detect binary targets
+        if: steps.detect.outputs.build_type == 'cargo'
+        id: bins
+        working-directory: source
+        run: |
+          BINS=$(cargo metadata --no-deps --format-version 1 2>/dev/null \
+            | jq -r '.packages[].targets[] | select(.kind[] == "bin") | .name' \
+            | sort -u | tr '\n' ' ' | xargs)
+          if [ -z "${BINS}" ]; then
+            echo "error: no binary targets found"
+            cargo metadata --no-deps --format-version 1 2>/dev/null | jq .
+            exit 1
+          fi
+          echo "bins=${BINS}" >> "$GITHUB_OUTPUT"
+          echo "==> detected bins: ${BINS}"
+
       - name: Build binaries (cargo)
         if: steps.detect.outputs.build_type == 'cargo'
         working-directory: source
         run: |
-          for binary in ${{ steps.detect.outputs.bins }}; do
+          for binary in ${{ steps.bins.outputs.bins }}; do
             echo "==> building ${binary}"
             cargo build --release --bin "${binary}"
           done
 
-      - name: Build .deb packages (cargo)
+      - name: Package .debs (cargo)
         if: steps.detect.outputs.build_type == 'cargo'
         working-directory: source
         run: |
           VER="${{ steps.version.outputs.version }}"
           ARCH="$(dpkg --print-architecture)"
           PKG="${{ steps.resolve.outputs.package }}"
+          mkdir -p /tmp/debs
 
-          for binary in ${{ steps.detect.outputs.bins }}; do
+          for binary in ${{ steps.bins.outputs.bins }}; do
             echo "==> packaging ${binary}"
             DEB_DIR="/tmp/debs/${binary}_${VER}_${ARCH}"
-            mkdir -p "${DEB_DIR}/DEBIAN"
-            mkdir -p "${DEB_DIR}/usr/local/bin"
-
+            mkdir -p "${DEB_DIR}/DEBIAN" "${DEB_DIR}/usr/local/bin"
             cp "target/release/${binary}" "${DEB_DIR}/usr/local/bin/${binary}"
             chmod 755 "${DEB_DIR}/usr/local/bin/${binary}"
 
-            cat > "${DEB_DIR}/DEBIAN/control" << CTRL
-          Package: ${binary}
-          Version: ${VER}
-          Architecture: ${ARCH}
-          Maintainer: goldfang <apt@realgoldfang.dev>
-          Description: ${binary} from ${PKG}
-          CTRL
-            sed -i '/^$/d' "${DEB_DIR}/DEBIAN/control"
-            sed -i 's/^ *//' "${DEB_DIR}/DEBIAN/control"
+            printf 'Package: %s\nVersion: %s\nArchitecture: %s\nMaintainer: goldfang <apt@realgoldfang.dev>\nDescription: %s from %s\n' \
+              "${binary}" "${VER}" "${ARCH}" "${binary}" "${PKG}" \
+              > "${DEB_DIR}/DEBIAN/control"
 
             dpkg-deb --build "${DEB_DIR}" "/tmp/debs/${binary}_${VER}_${ARCH}.deb"
           done
 
-      # -- C (make) --
+      # ──────────────────────────────────────────────────────────────
+      # C (make)
+      # ──────────────────────────────────────────────────────────────
       - name: Build binary (make)
         if: steps.detect.outputs.build_type == 'make'
         working-directory: source
@@ -176,38 +179,32 @@ jobs:
           make clean 2>/dev/null || true
           make -j"$(nproc)"
 
-      - name: Build .deb (make)
+      - name: Package .deb (make)
         if: steps.detect.outputs.build_type == 'make'
         working-directory: source
         run: |
           VER="${{ steps.version.outputs.version }}"
           ARCH="$(dpkg --print-architecture)"
           PKG="${{ steps.resolve.outputs.package }}"
+          mkdir -p /tmp/debs
 
           DEB_DIR="/tmp/debs/${PKG}_${VER}_${ARCH}"
-          mkdir -p "${DEB_DIR}/DEBIAN"
-          mkdir -p "${DEB_DIR}/usr/local/bin"
+          mkdir -p "${DEB_DIR}/DEBIAN" "${DEB_DIR}/usr/local/bin"
 
           BIN=$(find . -maxdepth 1 -type f -executable ! -name '*.o' ! -name '*.sh' | head -1)
-          if [ -z "${BIN}" ]; then
-            BIN="${PKG}"
-          fi
+          if [ -z "${BIN}" ]; then BIN="${PKG}"; fi
           cp "${BIN}" "${DEB_DIR}/usr/local/bin/"
-          chmod 755 "${DEB_DIR}/usr/local/bin/$(basename ${BIN})"
+          chmod 755 "${DEB_DIR}/usr/local/bin/$(basename "${BIN}")"
 
-          cat > "${DEB_DIR}/DEBIAN/control" << CTRL
-          Package: ${PKG}
-          Version: ${VER}
-          Architecture: ${ARCH}
-          Maintainer: goldfang <apt@realgoldfang.dev>
-          Description: ${PKG}
-          CTRL
-          sed -i '/^$/d' "${DEB_DIR}/DEBIAN/control"
-          sed -i 's/^ *//' "${DEB_DIR}/DEBIAN/control"
+          printf 'Package: %s\nVersion: %s\nArchitecture: %s\nMaintainer: goldfang <apt@realgoldfang.dev>\nDescription: %s\n' \
+            "${PKG}" "${VER}" "${ARCH}" "${PKG}" \
+            > "${DEB_DIR}/DEBIAN/control"
 
           dpkg-deb --build "${DEB_DIR}" "/tmp/debs/${PKG}_${VER}_${ARCH}.deb"
 
-      # -- Python (build-deb.sh) --
+      # ──────────────────────────────────────────────────────────────
+      # Python / build-deb.sh
+      # ──────────────────────────────────────────────────────────────
       - name: Set up Python
         if: steps.detect.outputs.build_type == 'script'
         uses: actions/setup-python@v5
@@ -223,7 +220,9 @@ jobs:
           mkdir -p /tmp/debs
           find . -name '*.deb' -exec cp {} /tmp/debs/ \;
 
-      # -- Electron --
+      # ──────────────────────────────────────────────────────────────
+      # Electron
+      # ──────────────────────────────────────────────────────────────
       - name: Set up Node.js
         if: steps.detect.outputs.build_type == 'electron'
         uses: actions/setup-node@v4
@@ -239,19 +238,28 @@ jobs:
           mkdir -p /tmp/debs
           find . -name '*.deb' -exec cp {} /tmp/debs/ \;
 
-      # -- Shared: GPG + aptly --
+      # ──────────────────────────────────────────────────────────────
+      # Verify we have debs to publish
+      # ──────────────────────────────────────────────────────────────
+      - name: Verify .deb output
+        run: |
+          echo "==> built debs:"
+          ls -la /tmp/debs/*.deb 2>/dev/null || { echo "error: no .deb files found"; exit 1; }
+
+      # ──────────────────────────────────────────────────────────────
+      # GPG + aptly
+      # ──────────────────────────────────────────────────────────────
       - name: Import GPG key
         env:
           APTLY_GPG_KEY: ${{ secrets.APTLY_GPG_KEY }}
-        run: |
-          echo "${APTLY_GPG_KEY}" | base64 -d | gpg --batch --import
+        run: echo "${APTLY_GPG_KEY}" | base64 -d | gpg --batch --import
 
       - name: Install aptly
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq aptly
 
-      - name: Restore existing packages from apt-repo
+      - name: Restore existing packages
         working-directory: apt-repo
         run: |
           mkdir -p /tmp/existing-debs
@@ -259,25 +267,25 @@ jobs:
             for ARCH in amd64 arm64; do
               PKGS="public/dists/${CODENAME}/main/binary-${ARCH}/Packages.gz"
               if [ -f "${PKGS}" ]; then
-                echo "==> restoring existing debs for ${CODENAME}/${ARCH}"
-                zcat "${PKGS}" | grep '^Filename:' | sed 's|^Filename: pool/|pool/|' | while read -r path; do
-                  FILENAME=$(basename "${path}")
+                echo "==> restoring debs for ${CODENAME}/${ARCH}"
+                zcat "${PKGS}" | grep '^Filename:' | while read -r line; do
+                  path="${line#Filename: }"
                   if [ -f "public/${path}" ]; then
-                    cp "public/${path}" "/tmp/existing-debs/${FILENAME}" 2>/dev/null || true
+                    cp "public/${path}" "/tmp/existing-debs/$(basename "${path}")" 2>/dev/null || true
                   fi
                 done
               fi
             done
           done
-          echo "==> restored $(ls /tmp/existing-debs/*.deb 2>/dev/null | wc -l) existing debs"
+          echo "==> restored $(find /tmp/existing-debs -name '*.deb' 2>/dev/null | wc -l) existing debs"
 
-      - name: Initialize aptly and publish
+      - name: Publish with aptly
         working-directory: apt-repo
         run: |
           export APTLY_ROOT="/tmp/aptly-root"
           mkdir -p "${APTLY_ROOT}"
 
-          cat > /tmp/aptly.conf << APTLYCONF
+          cat > /tmp/aptly.conf << EOF
           {
             "rootDir": "${APTLY_ROOT}",
             "downloadConcurrency": 4,
@@ -286,87 +294,78 @@ jobs:
             "publicPath": "",
             "serveInAPoint": false
           }
-          APTLYCONF
+          EOF
           sed -i '/^$/d' /tmp/aptly.conf
           sed -i 's/^ *//' /tmp/aptly.conf
 
+          KEY_ID="goldfang-apt-repo <apt@realgoldfang.dev>"
+
           for CODENAME in noble plucky; do
-            REPO_NAME="goldfang-${CODENAME}"
+            REPO="goldfang-${CODENAME}"
             aptly -config=/tmp/aptly.conf repo create \
-              -distribution="${CODENAME}" \
-              -component="main" \
-              -architectures="amd64,arm64" \
-              "${REPO_NAME}" 2>/dev/null || true
+              -distribution="${CODENAME}" -component="main" \
+              -architectures="amd64,arm64" "${REPO}" 2>/dev/null || true
           done
 
-          CODENAME=$(lsb_release -cs)
-          echo "==> runner codename: ${CODENAME}"
+          RUNNER_CODENAME="$(lsb_release -cs)"
+          SUPPORTED="${RUNNER_CODENAME}"
+          case "${RUNNER_CODENAME}" in noble|plucky) ;; *) SUPPORTED="noble" ;; esac
 
-          SUPPORTED_CODENAME="noble"
-          if [ "${CODENAME}" = "plucky" ] || [ "${CODENAME}" = "noble" ]; then
-            SUPPORTED_CODENAME="${CODENAME}"
-          fi
-
-          echo "==> adding restored existing debs"
+          echo "==> adding existing debs to ${SUPPORTED}"
           find /tmp/existing-debs -name '*.deb' 2>/dev/null | while read deb; do
-            aptly -config=/tmp/aptly.conf repo add "goldfang-${SUPPORTED_CODENAME}" "${deb}" || true
+            aptly -config=/tmp/aptly.conf repo add "goldfang-${SUPPORTED}" "${deb}" || true
           done
 
-          echo "==> adding new debs"
+          echo "==> adding new debs to ${SUPPORTED}"
           find /tmp/debs -name '*.deb' 2>/dev/null | while read deb; do
-            echo "==> adding $(basename ${deb}) to ${SUPPORTED_CODENAME}"
-            aptly -config=/tmp/aptly.conf repo add "goldfang-${SUPPORTED_CODENAME}" "${deb}" || true
+            echo "    + $(basename "${deb}")"
+            aptly -config=/tmp/aptly.conf repo add "goldfang-${SUPPORTED}" "${deb}" || true
           done
-
-          KEY_NAME="goldfang-apt-repo"
-          KEY_EMAIL="apt@realgoldfang.dev"
 
           for CODENAME in noble plucky; do
-            REPO_NAME="goldfang-${CODENAME}"
-            aptly -config=/tmp/aptly.conf repo show "${REPO_NAME}" 2>/dev/null || continue
+            REPO="goldfang-${CODENAME}"
+            aptly -config=/tmp/aptly.conf repo show "${REPO}" 2>/dev/null || continue
 
             if aptly -config=/tmp/aptly.conf publish list -raw 2>/dev/null | grep -q "^${CODENAME} "; then
-              echo "==> updating ${CODENAME}"
-              aptly -config=/tmp/aptly.conf publish update \
-                -batch \
-                -gpg-key="${KEY_NAME} <${KEY_EMAIL}>" \
-                -distribution="${CODENAME}" \
-                -architectures="amd64,arm64" \
-                "${CODENAME}" public || true
+              echo "==> updating publish ${CODENAME}"
+              aptly -config=/tmp/aptly.conf publish update -batch \
+                -gpg-key="${KEY_ID}" -distribution="${CODENAME}" \
+                -architectures="amd64,arm64" "${CODENAME}" public || true
             else
-              echo "==> publishing ${CODENAME}"
-              aptly -config=/tmp/aptly.conf publish repo \
-                -batch \
-                -gpg-key="${KEY_NAME} <${KEY_EMAIL}>" \
-                -distribution="${CODENAME}" \
-                -component="main" \
-                -architectures="amd64,arm64" \
-                "${REPO_NAME}" public || true
+              echo "==> creating publish ${CODENAME}"
+              aptly -config=/tmp/aptly.conf publish repo -batch \
+                -gpg-key="${KEY_ID}" -distribution="${CODENAME}" \
+                -component="main" -architectures="amd64,arm64" \
+                "${REPO}" public || true
             fi
           done
 
           echo "==> published tree:"
           find public/ -type f | head -30
 
+      # ──────────────────────────────────────────────────────────────
+      # Push to apt-repo
+      # ──────────────────────────────────────────────────────────────
       - name: Commit and push apt-repo
         working-directory: apt-repo
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
-          git diff --cached --quiet && echo "no changes to commit" && exit 0
+          git diff --cached --quiet && echo "no changes" && exit 0
           git commit -m "apt: add ${{ steps.resolve.outputs.package }} ${{ steps.resolve.outputs.tag }}"
           git push
 
-      - name: Export public key to site repo
+      # ──────────────────────────────────────────────────────────────
+      # Update pubkey in site repo (triggers deploy-site)
+      # ──────────────────────────────────────────────────────────────
+      - name: Export public key
         working-directory: this-repo
         run: |
-          KEY_NAME="goldfang-apt-repo"
-          KEY_EMAIL="apt@realgoldfang.dev"
           mkdir -p site/public/apt
-          gpg --export --armor "${KEY_NAME} <${KEY_EMAIL}>" > site/public/apt/pubkey.gpg
+          gpg --export --armor "goldfang-apt-repo <apt@realgoldfang.dev>" > site/public/apt/pubkey.gpg
 
-      - name: Commit and push site repo (triggers deploy-site)
+      - name: Commit and push site repo
         working-directory: this-repo
         run: |
           git config user.name "github-actions[bot]"
