@@ -250,8 +250,8 @@ jobs:
                 echo "==> restoring existing debs for ${CODENAME}/${ARCH}"
                 zcat "${PKGS}" | grep '^Filename:' | sed 's|^Filename: pool/|pool/|' | while read -r path; do
                   FILENAME=$(basename "${path}")
-                  if [ -f "${path}" ]; then
-                    cp "${path}" "/tmp/existing-debs/${FILENAME}" 2>/dev/null || true
+                  if [ -f "public/${path}" ]; then
+                    cp "public/${path}" "/tmp/existing-debs/${FILENAME}" 2>/dev/null || true
                   fi
                 done
               fi
