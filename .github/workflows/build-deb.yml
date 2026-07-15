@@ -351,10 +351,16 @@ jobs:
             echo "error: aptly did not produce public/ output"
             exit 1
           fi
+          echo "==> APTLY_PUBLIC contents:"
+          ls -la "${APTLY_PUBLIC}"
+          echo "==> APTLY_PUBLIC subdirs:"
+          find "${APTLY_PUBLIC}" -maxdepth 2 -type d
           rm -rf public
           mkdir -p public
           cp -r "${APTLY_PUBLIC}"/* public/
           echo "==> copied aptly output to apt-repo/public/"
+          echo "==> public/ contents:"
+          ls -la public/
           find public/ -type f | head -30
 
       # ──────────────────────────────────────────────────────────────
