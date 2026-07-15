@@ -265,8 +265,18 @@ jobs:
           export APTLY_ROOT="/tmp/aptly-root"
           mkdir -p "${APTLY_ROOT}"
 
-          cp conf/aptly.conf /tmp/aptly.conf
-          sed -i "s|/tmp/aptly-root|${APTLY_ROOT}|g" /tmp/aptly.conf
+          cat > /tmp/aptly.conf << APTLYCONF
+          {
+            "rootDir": "${APTLY_ROOT}",
+            "downloadConcurrency": 4,
+            "downloadPath": "${APTLY_ROOT}/downloads",
+            "databasePath": "${APTLY_ROOT}/db",
+            "publicPath": "",
+            "serveInAPoint": false
+          }
+          APTLYCONF
+          sed -i '/^$/d' /tmp/aptly.conf
+          sed -i 's/^ *//' /tmp/aptly.conf
 
           for CODENAME in noble plucky; do
             REPO_NAME="goldfang-${CODENAME}"
@@ -298,9 +308,6 @@ jobs:
 
           KEY_NAME="goldfang-apt-repo"
           KEY_EMAIL="apt@realgoldfang.dev"
-          PUBLISH_DIR="/tmp/publish-root"
-          rm -rf "${PUBLISH_DIR}"
-          mkdir -p "${PUBLISH_DIR}"
 
           for CODENAME in noble plucky; do
             REPO_NAME="goldfang-${CODENAME}"
@@ -313,7 +320,7 @@ jobs:
                 -gpg-key="${KEY_NAME} <${KEY_EMAIL}>" \
                 -distribution="${CODENAME}" \
                 -architectures="amd64,arm64" \
-                "${CODENAME}" "${PUBLISH_DIR}" || true
+                "${CODENAME}" public || true
             else
               echo "==> publishing ${CODENAME}"
               aptly -config=/tmp/aptly.conf publish repo \
@@ -322,22 +329,11 @@ jobs:
                 -distribution="${CODENAME}" \
                 -component="main" \
                 -architectures="amd64,arm64" \
-                "${REPO_NAME}" "${PUBLISH_DIR}" || true
+                "${REPO_NAME}" public || true
             fi
           done
 
           echo "==> published tree:"
-          find "${PUBLISH_DIR}" -type f | head -30
-
-      - name: Copy published repo to apt-repo checkout
-        working-directory: apt-repo
-        run: |
-          PUBLISH_DIR="/tmp/publish-root"
-          rm -rf public
-          mkdir -p public
-          cp -r "${PUBLISH_DIR}/." public/
-
-          echo "==> final tree:"
           find public/ -type f | head -30
 
       - name: Commit and push apt-repo
