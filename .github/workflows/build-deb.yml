@@ -99,14 +99,9 @@ jobs:
                 for member in $(grep -A100 '^\[workspace\]' Cargo.toml | grep -A50 'members' | grep '"' | sed 's/.*"\(.*\)".*/\1/'); do
                   if [ -f "${member}/Cargo.toml" ]; then
                     MEMBER_BINS=$(grep -A1 '^\[\[bin\]\]' "${member}/Cargo.toml" 2>/dev/null | grep 'name' | sed 's/.*name.*=.*"\(.*\)"/\1/' | tr '\n' ' ')
-                    if [ -z "${MEMBER_BINS}" ]; then
-                      MEMBER_BINS=$(grep '^name' "${member}/Cargo.toml" 2>/dev/null | head -1 | sed 's/.*=.*"\(.*\)"/\1/')
-                    fi
                     BINS="${BINS}${MEMBER_BINS} "
                   fi
                 done
-              else
-                BINS=$(grep '^name' Cargo.toml | head -1 | sed 's/.*=.*"\(.*\)"/\1/')
               fi
             fi
             BINS=$(echo "${BINS}" | xargs)
