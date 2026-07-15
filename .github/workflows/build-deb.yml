@@ -298,7 +298,9 @@ jobs:
 
           KEY_NAME="goldfang-apt-repo"
           KEY_EMAIL="apt@realgoldfang.dev"
-          OUTPUT="${APTLY_ROOT}/public"
+          PUBLISH_DIR="/tmp/publish-root"
+          rm -rf "${PUBLISH_DIR}"
+          mkdir -p "${PUBLISH_DIR}"
 
           for CODENAME in noble plucky; do
             REPO_NAME="goldfang-${CODENAME}"
@@ -311,7 +313,7 @@ jobs:
                 -gpg-key="${KEY_NAME} <${KEY_EMAIL}>" \
                 -distribution="${CODENAME}" \
                 -architectures="amd64,arm64" \
-                "${CODENAME}" "${OUTPUT}" || true
+                "${CODENAME}" "${PUBLISH_DIR}" || true
             else
               echo "==> publishing ${CODENAME}"
               aptly -config=/tmp/aptly.conf publish repo \
@@ -320,18 +322,20 @@ jobs:
                 -distribution="${CODENAME}" \
                 -component="main" \
                 -architectures="amd64,arm64" \
-                "${REPO_NAME}" "${OUTPUT}" || true
+                "${REPO_NAME}" "${PUBLISH_DIR}" || true
             fi
           done
 
           echo "==> published tree:"
-          find "${OUTPUT}" -type f | head -30
+          find "${PUBLISH_DIR}" -type f | head -30
 
-      - name: Update apt-repo working copy
+      - name: Copy published repo to apt-repo checkout
         working-directory: apt-repo
         run: |
+          PUBLISH_DIR="/tmp/publish-root"
           rm -rf public
-          cp -r /tmp/aptly-root/public/. public/
+          mkdir -p public
+          cp -r "${PUBLISH_DIR}/." public/
 
           echo "==> final tree:"
           find public/ -type f | head -30
@@ -354,17 +358,12 @@ jobs:
           mkdir -p site/public/apt
           gpg --export --armor "${KEY_NAME} <${KEY_EMAIL}>" > site/public/apt/pubkey.gpg
 
-      - name: Commit and push site repo
+      - name: Commit and push site repo (triggers deploy-site)
         working-directory: this-repo
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add site/public/apt/pubkey.gpg
-          git commit -m "chore: update apt signing key" --allow-empty
+          git diff --cached --quiet && echo "no site changes" && exit 0
+          git commit -m "chore: update apt signing key"
           git push
-
-      - name: Trigger site deploy
-        env:
-          GH_TOKEN: ${{ secrets.APT_PAT }}
-        run: |
-          gh workflow run deploy-site.yml --repo realgoldfang/realgoldfang.github.io
