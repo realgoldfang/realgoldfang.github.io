@@ -1,6 +1,6 @@
 # .github/workflows/deploy-site.yml
 # Builds the Astro site and deploys to GitHub Pages.
-# Also copies the apt repo tree (managed by build-deb.yml) into the Pages artifact.
+# Clones the apt-repo repo and includes it in the Pages artifact.
 
 name: Deploy Site
 
@@ -36,14 +36,20 @@ jobs:
         working-directory: site
         run: npm run build
 
+      - name: Checkout apt-repo
+        uses: actions/checkout@v4
+        with:
+          repository: realgoldfang/apt-repo
+          path: apt-repo
+
       - name: Ensure apt dir exists
         run: mkdir -p site/dist/apt
 
-      - name: Copy apt repo tree into Pages artifact
+      - name: Copy apt repo into Pages artifact
         run: |
           if [ -d "apt-repo/public" ] && [ "$(ls -A apt-repo/public 2>/dev/null)" ]; then
-            cp -r apt-repo/public/* site/dist/apt/
-            echo "apt repo tree copied to site/dist/apt/"
+            cp -r apt-repo/public/. site/dist/apt/
+            echo "apt repo copied to site/dist/apt/"
           else
             echo "no apt-repo/public/ found, skipping apt repo in this deploy"
           fi
