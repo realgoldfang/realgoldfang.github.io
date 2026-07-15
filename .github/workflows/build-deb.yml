@@ -340,7 +340,20 @@ jobs:
             fi
           done
 
-          echo "==> published tree:"
+          echo "==> aptly public tree:"
+          find "${APTLY_ROOT}/public/" -type f | head -30
+
+      - name: Copy published repo into apt-repo checkout
+        working-directory: apt-repo
+        run: |
+          APTLY_PUBLIC="/tmp/aptly-root/public"
+          if [ ! -d "${APTLY_PUBLIC}" ]; then
+            echo "error: aptly did not produce public/ output"
+            exit 1
+          fi
+          rm -rf public
+          cp -r "${APTLY_PUBLIC}" public
+          echo "==> copied aptly output to apt-repo/public/"
           find public/ -type f | head -30
 
       # ──────────────────────────────────────────────────────────────
