@@ -90,11 +90,28 @@ jobs:
             echo "build_type=script" >> "$GITHUB_OUTPUT"
           elif [ -f "Cargo.toml" ]; then
             echo "build_type=cargo" >> "$GITHUB_OUTPUT"
+            # Try root-level [[bin]] first
             BINS=$(grep -A1 '^\[\[bin\]\]' Cargo.toml 2>/dev/null | grep 'name' | sed 's/.*name.*=.*"\(.*\)"/\1/' | tr '\n' ' ')
+            # If empty, try workspace: find [[bin]] in each member
             if [ -z "${BINS}" ]; then
-              BINS=$(grep '^name' Cargo.toml | head -1 | sed 's/.*=.*"\(.*\)"/\1/')
+              if grep -q '^\[workspace\]' Cargo.toml 2>/dev/null; then
+                echo "==> detected workspace project"
+                for member in $(grep -A100 '^\[workspace\]' Cargo.toml | grep -A50 'members' | grep '"' | sed 's/.*"\(.*\)".*/\1/'); do
+                  if [ -f "${member}/Cargo.toml" ]; then
+                    MEMBER_BINS=$(grep -A1 '^\[\[bin\]\]' "${member}/Cargo.toml" 2>/dev/null | grep 'name' | sed 's/.*name.*=.*"\(.*\)"/\1/' | tr '\n' ' ')
+                    if [ -z "${MEMBER_BINS}" ]; then
+                      MEMBER_BINS=$(grep '^name' "${member}/Cargo.toml" 2>/dev/null | head -1 | sed 's/.*=.*"\(.*\)"/\1/')
+                    fi
+                    BINS="${BINS}${MEMBER_BINS} "
+                  fi
+                done
+              else
+                BINS=$(grep '^name' Cargo.toml | head -1 | sed 's/.*=.*"\(.*\)"/\1/')
+              fi
             fi
+            BINS=$(echo "${BINS}" | xargs)
             echo "bins=${BINS}" >> "$GITHUB_OUTPUT"
+            echo "==> detected bins: ${BINS}"
           elif [ -f "Makefile" ] && [ -f "*.c" ] 2>/dev/null; then
             echo "build_type=make" >> "$GITHUB_OUTPUT"
           elif [ -f "package.json" ]; then
