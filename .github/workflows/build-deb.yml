@@ -312,4 +312,5 @@ jobs:
           git add apt-repo/public/ site/public/apt/pubkey.gpg
           git diff --cached --quiet && echo "no changes to commit" && exit 0
           git commit -m "apt: update repo with ${{ steps.resolve.outputs.package }} ${{ steps.resolve.outputs.tag }}"
+          git pull --rebase origin master
           git push
